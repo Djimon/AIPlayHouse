@@ -1,3 +1,4 @@
+from dndtracker.backend.models import EncounterAccess
 from dndtracker.backend.store import InMemoryEncounterStore, PostgresEncounterStore, create_store
 
 
@@ -68,3 +69,90 @@ def test_in_memory_store_accepts_roll_and_chat_for_player() -> None:
     assert chat_state["chat"][-1]["text"] == "hello"
     assert chat_state["log"][-2]["kind"] == "roll"
     assert chat_state["log"][-1]["kind"] == "chat"
+
+
+class _FakeCursor:
+    def __init__(self) -> None:
+        self.commands: list[tuple[str, tuple]] = []
+
+    def execute(self, sql: str, params: tuple) -> None:
+        self.commands.append((sql, params))
+
+    def __enter__(self) -> "_FakeCursor":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        return None
+
+
+class _FakeConnection:
+    def __init__(self) -> None:
+        self.cursor_instance = _FakeCursor()
+        self.committed = False
+
+    def cursor(self) -> _FakeCursor:
+        return self.cursor_instance
+
+    def commit(self) -> None:
+        self.committed = True
+
+    def __enter__(self) -> "_FakeConnection":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        return None
+
+
+class _PostgresStoreWithFakeConnection(PostgresEncounterStore):
+    def __init__(self) -> None:
+        super().__init__(database_url="postgresql://local", server_salt="salt")
+        self.fake_connection = _FakeConnection()
+
+    def _connect(self) -> _FakeConnection:
+        return self.fake_connection
+
+
+def test_postgres_apply_action_persists_snapshot_and_updates_version() -> None:
+    store = _PostgresStoreWithFakeConnection()
+    state = {
+        "id": "enc-1",
+        "version": 1,
+        "status": "setup",
+        "round": 1,
+        "turnIndex": 0,
+        "turnOrder": ["a", "b"],
+        "effects": [],
+        "meta": {
+            "name": "Session",
+            "createdAt": "2024-01-01T00:00:00+00:00",
+            "updatedAt": "2024-01-01T00:00:00+00:00",
+        },
+        "chat": [],
+        "log": [],
+    }
+
+    store.get_encounter_access = lambda encounter_id, raw_token: EncounterAccess(
+        encounter_id="enc-1",
+        role="HOST",
+        state=state,
+    )
+
+    next_state = store.apply_action(encounter_id="enc-1", raw_token="host", action={"type": "NEXT_TURN"})
+
+    assert next_state is not None
+    assert next_state["version"] == 2
+    assert next_state["status"] == "running"
+    assert store.fake_connection.committed is True
+    assert len(store.fake_connection.cursor_instance.commands) == 2
+    assert "INSERT INTO encounter_snapshots" in store.fake_connection.cursor_instance.commands[0][0]
+    assert "UPDATE encounters" in store.fake_connection.cursor_instance.commands[1][0]
+
+
+def test_postgres_apply_action_rejects_non_host() -> None:
+    store = _PostgresStoreWithFakeConnection()
+    store.get_encounter_access = lambda encounter_id, raw_token: None
+
+    next_state = store.apply_action(encounter_id="enc-1", raw_token="player", action={"type": "NEXT_TURN"})
+
+    assert next_state is None
+    assert store.fake_connection.committed is False
