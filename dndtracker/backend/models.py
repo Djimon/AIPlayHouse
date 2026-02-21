@@ -13,6 +13,13 @@ class EncounterRecord:
 
 
 @dataclass(frozen=True)
+class EncounterAccess:
+    encounter_id: str
+    role: str
+    state: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class EncounterTokens:
     host_token: str
     player_token: str
