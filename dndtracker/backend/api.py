@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from dndtracker.backend.config import load_settings
 from dndtracker.backend.security import generate_token
-from dndtracker.backend.store import EncounterStore, create_store
+from dndtracker.backend.store import EncounterStore, InMemoryEncounterStore
 
 
 class CreateEncounterRequest(BaseModel):
@@ -27,8 +27,8 @@ class EncounterStateResponse(BaseModel):
 
 
 def _default_store() -> EncounterStore:
-    settings = load_settings()
-    return create_store(database_url=settings.database_url, server_salt=settings.server_salt)
+    server_salt = os.getenv("DNDTRACKER_SERVER_SALT", "dev-salt")
+    return InMemoryEncounterStore(server_salt=server_salt)
 
 
 def create_app(store: EncounterStore | None = None) -> FastAPI:
