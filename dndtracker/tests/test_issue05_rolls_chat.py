@@ -4,10 +4,10 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from backend.api import create_app
-from backend.models import EncounterAccess
-from backend.state import build_initial_state
-from backend.store import InMemoryEncounterStore, PostgresEncounterStore
+from dndtracker.backend.api import create_app
+from dndtracker.backend.models import EncounterAccess
+from dndtracker.backend.state import build_initial_state
+from dndtracker.backend.store import InMemoryEncounterStore, PostgresEncounterStore
 
 
 class FakeCursor:
@@ -42,7 +42,7 @@ class FakeConnection:
         self.committed = True
 
 
-class TestPostgresStore(PostgresEncounterStore):
+class FakePostgresStore(PostgresEncounterStore):
     def __init__(self, access: EncounterAccess | None):
         super().__init__(database_url="postgresql://unused", server_salt="salt")
         self._access = access
@@ -98,7 +98,7 @@ class Issue05RollsChatTests(unittest.TestCase):
     def test_postgres_append_roll_persists_roll_and_snapshot(self):
         base_state = build_initial_state(encounter_id="enc-1", name="Issue5")
         access = EncounterAccess(encounter_id="enc-1", role="PLAYER", state=base_state)
-        store = TestPostgresStore(access=access)
+        store = FakePostgresStore(access=access)
 
         state = store.append_roll(encounter_id="enc-1", raw_token="tok", roll={"kind": "d20", "value": 18})
 
@@ -115,7 +115,7 @@ class Issue05RollsChatTests(unittest.TestCase):
     def test_postgres_append_chat_persists_chat_and_snapshot(self):
         base_state = build_initial_state(encounter_id="enc-2", name="Issue5")
         access = EncounterAccess(encounter_id="enc-2", role="HOST", state=base_state)
-        store = TestPostgresStore(access=access)
+        store = FakePostgresStore(access=access)
 
         state = store.append_chat(encounter_id="enc-2", raw_token="tok", message="Ping")
 
