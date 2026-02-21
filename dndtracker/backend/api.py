@@ -27,6 +27,21 @@ class EncounterStateResponse(BaseModel):
     state: dict[str, Any]
 
 
+class ActionEnvelope(BaseModel):
+    token: str = Field(min_length=1)
+    action: dict[str, Any]
+
+
+class RollEnvelope(BaseModel):
+    token: str = Field(min_length=1)
+    roll: dict[str, Any]
+
+
+class ChatEnvelope(BaseModel):
+    token: str = Field(min_length=1)
+    message: str = Field(min_length=1, max_length=1000)
+
+
 class EncounterWebSocketHub:
     def __init__(self) -> None:
         self._connections: dict[str, set[WebSocket]] = defaultdict(set)
@@ -63,7 +78,7 @@ def _default_store() -> EncounterStore:
 
 
 def create_app(store: EncounterStore | None = None) -> FastAPI:
-    app = FastAPI(title="DND Tracker API", version="0.1.0")
+    app = FastAPI(title="DND Tracker API", version="0.2.0")
     encounter_store = store if store is not None else _default_store()
     websocket_hub = EncounterWebSocketHub()
     app.state.websocket_hub = websocket_hub
@@ -104,6 +119,42 @@ def create_app(store: EncounterStore | None = None) -> FastAPI:
         if record is None:
             raise HTTPException(status_code=404, detail="Encounter not found or token invalid")
         return EncounterStateResponse(state=record.state)
+
+    @app.post("/api/encounters/{encounter_id}/actions", response_model=EncounterStateResponse)
+    async def post_action(
+        encounter_id: str,
+        payload: ActionEnvelope,
+        local_store: EncounterStore = Depends(get_store),
+    ) -> EncounterStateResponse:
+        state = local_store.apply_action(encounter_id=encounter_id, raw_token=payload.token, action=payload.action)
+        if state is None:
+            raise HTTPException(status_code=403, detail="Action not allowed")
+        await publish_state(encounter_id=encounter_id, state=state)
+        return EncounterStateResponse(state=state)
+
+    @app.post("/api/encounters/{encounter_id}/rolls", response_model=EncounterStateResponse)
+    async def post_roll(
+        encounter_id: str,
+        payload: RollEnvelope,
+        local_store: EncounterStore = Depends(get_store),
+    ) -> EncounterStateResponse:
+        state = local_store.append_roll(encounter_id=encounter_id, raw_token=payload.token, roll=payload.roll)
+        if state is None:
+            raise HTTPException(status_code=403, detail="Roll not allowed")
+        await publish_state(encounter_id=encounter_id, state=state)
+        return EncounterStateResponse(state=state)
+
+    @app.post("/api/encounters/{encounter_id}/chat", response_model=EncounterStateResponse)
+    async def post_chat(
+        encounter_id: str,
+        payload: ChatEnvelope,
+        local_store: EncounterStore = Depends(get_store),
+    ) -> EncounterStateResponse:
+        state = local_store.append_chat(encounter_id=encounter_id, raw_token=payload.token, message=payload.message)
+        if state is None:
+            raise HTTPException(status_code=403, detail="Chat not allowed")
+        await publish_state(encounter_id=encounter_id, state=state)
+        return EncounterStateResponse(state=state)
 
     @app.websocket("/ws/encounters/{encounter_id}")
     async def encounter_ws(

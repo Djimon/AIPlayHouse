@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DND Tracker V0</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background: #10121a; color: #e8eaf1; }
+    .panel { background: #1b2030; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    input, button, textarea { width: 100%; margin-top: 6px; margin-bottom: 8px; padding: 8px; border-radius: 6px; border: 1px solid #3d465f; background: #0d1220; color: #e8eaf1; }
+    button { cursor: pointer; background: #2c4fff; border: none; }
+    button:disabled { background: #5b6175; cursor: not-allowed; }
+    .row { display: flex; gap: 12px; }
+    .row > .panel { flex: 1; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #0d1220; padding: 8px; border-radius: 6px; }
+    .small { font-size: 12px; color: #9aa0b6; }
+  </style>
+</head>
+<body>
+  <h1>DND Tracker V0</h1>
+  <div class="panel">
+    <div><strong>Rolle:</strong> <span id="role">-</span></div>
+    <div><strong>Server:</strong> <span id="server">-</span></div>
+    <div><strong>Encounter:</strong> <span id="encounter">-</span></div>
+  </div>
+
+  <div class="row">
+    <div class="panel">
+      <h3>Host</h3>
+      <input id="encounterName" placeholder="Encounter Name" value="Session Local" />
+      <button id="createEncounterBtn">Encounter erstellen</button>
+      <div class="small">Host-Token</div>
+      <pre id="hostToken">-</pre>
+      <div class="small">Player-Token</div>
+      <pre id="playerToken">-</pre>
+      <button id="hostActionBtn" disabled>Host Action: NEXT_TURN</button>
+    </div>
+
+    <div class="panel">
+      <h3>Player/Join</h3>
+      <input id="joinEncounterId" placeholder="Encounter ID" />
+      <input id="joinToken" placeholder="Token" />
+      <button id="joinBtn">Beitreten</button>
+      <button id="rollBtn" disabled>Roll senden (d20=14)</button>
+      <textarea id="chatText" placeholder="Chat Nachricht"></textarea>
+      <button id="chatBtn" disabled>Chat senden</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>State</h3>
+    <pre id="state">-</pre>
+  </div>
+
+<script src="./app.js"></script>
+
+</body>
+</html>
