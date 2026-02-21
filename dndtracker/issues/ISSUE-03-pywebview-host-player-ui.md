@@ -26,3 +26,9 @@ Zwei lokale Programm-Instanzen als Host- und Player-UI nutzbar machen.
 ## Abhängigkeiten
 - ISSUE-01.
 - ISSUE-02.
+
+## Status-Hinweis (Implementierungsstand)
+- Der aktuelle Stand nutzt für Mutationen noch den In-Memory-Store.
+- PostgreSQL-Mutationen/Snapshots sind noch nicht umgesetzt und müssen in den nachfolgenden Server/Engine-Issues auf Postgres migriert werden.
+- Die bestehenden `PostgresEncounterStore`-Mutationspfade sind derzeit noch `NotImplementedError`.
+

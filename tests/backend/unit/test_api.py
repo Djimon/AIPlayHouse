@@ -52,6 +52,49 @@ def test_get_encounter_rejects_invalid_token() -> None:
     assert response.status_code == 404
 
 
+def test_post_action_accepts_host_and_rejects_player() -> None:
+    store = InMemoryEncounterStore(server_salt="test-salt")
+    client = TestClient(create_app(store=store))
+
+    created = client.post("/api/encounters", json={"name": "Session 1"}).json()
+    encounter_id = created["encounter_id"]
+
+    forbidden = client.post(
+        f"/api/encounters/{encounter_id}/actions",
+        json={"token": created["player_token"], "action": {"type": "NEXT_TURN"}},
+    )
+    allowed = client.post(
+        f"/api/encounters/{encounter_id}/actions",
+        json={"token": created["host_token"], "action": {"type": "NEXT_TURN"}},
+    )
+
+    assert forbidden.status_code == 403
+    assert allowed.status_code == 200
+    assert allowed.json()["state"]["status"] == "running"
+
+
+def test_post_roll_and_chat_accept_player() -> None:
+    store = InMemoryEncounterStore(server_salt="test-salt")
+    client = TestClient(create_app(store=store))
+
+    created = client.post("/api/encounters", json={"name": "Session 1"}).json()
+    encounter_id = created["encounter_id"]
+    token = created["player_token"]
+
+    roll_response = client.post(
+        f"/api/encounters/{encounter_id}/rolls",
+        json={"token": token, "roll": {"kind": "d20", "value": 14}},
+    )
+    chat_response = client.post(
+        f"/api/encounters/{encounter_id}/chat",
+        json={"token": token, "message": "Hallo"},
+    )
+
+    assert roll_response.status_code == 200
+    assert chat_response.status_code == 200
+    assert chat_response.json()["state"]["chat"][-1]["text"] == "Hallo"
+
+
 def test_websocket_sends_initial_state_after_connect() -> None:
     store = InMemoryEncounterStore(server_salt="test-salt")
     app = create_app(store=store)
@@ -96,27 +139,15 @@ def test_websocket_broadcasts_full_state_to_all_clients() -> None:
                 ws_host.receive_json()
                 ws_player.receive_json()
 
-                broadcast_state = {
-                    "id": encounter_id,
-                    "version": 2,
-                    "status": "running",
-                    "round": 1,
-                    "turnIndex": 0,
-                    "turnOrder": [],
-                    "actors": {},
-                    "effects": [],
-                    "concentration": {},
-                    "chat": [],
-                    "log": [],
-                    "meta": {"name": "Session WS", "createdAt": "t0", "updatedAt": "t1"},
-                }
-
-                client.portal.call(app.state.publish_state, encounter_id, broadcast_state)
+                client.post(
+                    f"/api/encounters/{encounter_id}/chat",
+                    json={"token": player_token, "message": "sync me"},
+                )
 
                 host_message = ws_host.receive_json()
                 player_message = ws_player.receive_json()
 
     assert host_message["type"] == "state.full"
     assert player_message["type"] == "state.full"
-    assert host_message["state"] == broadcast_state
-    assert player_message["state"] == broadcast_state
+    assert host_message["state"]["chat"][-1]["text"] == "sync me"
+    assert player_message["state"]["chat"][-1]["text"] == "sync me"

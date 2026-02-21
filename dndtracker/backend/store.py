@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Protocol
+from typing import Any, Protocol
 
 from dndtracker.backend.models import CreatedEncounter, EncounterAccess, EncounterRecord
 from dndtracker.backend.security import hash_token
@@ -21,6 +21,15 @@ class EncounterStore(Protocol):
 
     def get_encounter_access(self, encounter_id: str, raw_token: str) -> EncounterAccess | None:
         """Return encounter role and state when token is valid."""
+
+    def apply_action(self, encounter_id: str, raw_token: str, action: dict[str, Any]) -> dict[str, Any] | None:
+        """Apply a host action and return new state when authorized."""
+
+    def append_roll(self, encounter_id: str, raw_token: str, roll: dict[str, Any]) -> dict[str, Any] | None:
+        """Append a roll entry and return new state when authorized."""
+
+    def append_chat(self, encounter_id: str, raw_token: str, message: str) -> dict[str, Any] | None:
+        """Append a chat entry and return new state when authorized."""
 
 
 @dataclass
@@ -67,6 +76,60 @@ class InMemoryEncounterStore:
             return None
         return EncounterAccess(encounter_id=encounter_id, role=role, state=payload["state"])
 
+    def apply_action(self, encounter_id: str, raw_token: str, action: dict[str, Any]) -> dict[str, Any] | None:
+        access = self.get_encounter_access(encounter_id=encounter_id, raw_token=raw_token)
+        if access is None or access.role != "HOST":
+            return None
+        payload = self._encounters[encounter_id]
+        payload["state"] = self._next_state_with_event(
+            state=payload["state"],
+            event={"kind": "action", "role": "HOST", "action": action},
+        )
+        return payload["state"]
+
+    def append_roll(self, encounter_id: str, raw_token: str, roll: dict[str, Any]) -> dict[str, Any] | None:
+        access = self.get_encounter_access(encounter_id=encounter_id, raw_token=raw_token)
+        if access is None:
+            return None
+        payload = self._encounters[encounter_id]
+        payload["state"] = self._next_state_with_event(
+            state=payload["state"],
+            event={"kind": "roll", "role": access.role, "roll": roll},
+        )
+        return payload["state"]
+
+    def append_chat(self, encounter_id: str, raw_token: str, message: str) -> dict[str, Any] | None:
+        access = self.get_encounter_access(encounter_id=encounter_id, raw_token=raw_token)
+        if access is None:
+            return None
+        payload = self._encounters[encounter_id]
+        payload["state"] = self._next_state_with_event(
+            state=payload["state"],
+            event={"kind": "chat", "role": access.role, "message": message},
+        )
+        return payload["state"]
+
+    def _next_state_with_event(self, state: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]:
+        next_state = dict(state)
+        next_state["version"] = int(state["version"]) + 1
+        next_meta = dict(state["meta"])
+        next_meta["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        next_state["meta"] = next_meta
+
+        next_log = list(state.get("log", []))
+        next_log.append(event)
+        next_state["log"] = next_log
+
+        if event["kind"] == "chat":
+            next_chat = list(state.get("chat", []))
+            next_chat.append({"role": event["role"], "text": event["message"]})
+            next_state["chat"] = next_chat
+
+        if event["kind"] == "action" and state.get("status") == "setup":
+            next_state["status"] = "running"
+
+        return next_state
+
 
 @dataclass
 class PostgresEncounterStore:
@@ -81,6 +144,15 @@ class PostgresEncounterStore:
 
     def get_encounter_access(self, encounter_id: str, raw_token: str) -> EncounterAccess | None:
         raise NotImplementedError("PostgresEncounterStore is not implemented in ISSUE-02 scope")
+
+    def apply_action(self, encounter_id: str, raw_token: str, action: dict[str, Any]) -> dict[str, Any] | None:
+        raise NotImplementedError("PostgresEncounterStore is not implemented in ISSUE-03 scope")
+
+    def append_roll(self, encounter_id: str, raw_token: str, roll: dict[str, Any]) -> dict[str, Any] | None:
+        raise NotImplementedError("PostgresEncounterStore is not implemented in ISSUE-03 scope")
+
+    def append_chat(self, encounter_id: str, raw_token: str, message: str) -> dict[str, Any] | None:
+        raise NotImplementedError("PostgresEncounterStore is not implemented in ISSUE-03 scope")
 
 
 def create_store(database_url: str | None, server_salt: str) -> EncounterStore:

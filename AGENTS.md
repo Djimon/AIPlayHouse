@@ -140,6 +140,13 @@ Architecture review checks:
 
 Functional correctness is covered by tests.
 
+## 5.4 Frontend-Separation (verbindlich)
+- Kein Inline-JavaScript in HTML-Dateien (`<script>...</script>` mit Logik ist verboten).
+- Kein Inline-CSS für komponentenübergreifende Styles (nur minimaler Ausnahmefall für Debug ist erlaubt, nicht für finale Änderungen).
+- Frontend-Logik liegt in dedizierten `.js`/`.ts`-Dateien, die über `src` eingebunden werden.
+- HTML ist für Struktur/Markup, CSS für Darstellung, JS/TS für Verhalten.
+- PRs mit UI-Änderungen müssen diese Trennung explizit einhalten.
+
 ---
 
 # 6. Versioning Rule
