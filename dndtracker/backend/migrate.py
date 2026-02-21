@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dndtracker.backend.config import load_settings
+from .config import load_settings
 
 
 def main() -> None:
