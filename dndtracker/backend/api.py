@@ -9,8 +9,8 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
-from dndtracker.backend.security import generate_token
-from dndtracker.backend.store import EncounterStore, InMemoryEncounterStore
+from .security import generate_token
+from .store import EncounterStore, InMemoryEncounterStore
 
 
 class CreateEncounterRequest(BaseModel):

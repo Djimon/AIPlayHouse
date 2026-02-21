@@ -8,10 +8,46 @@ import json
 from typing import Any, Protocol
 import uuid
 
-from dndtracker.backend.engine import apply_host_action
-from dndtracker.backend.models import CreatedEncounter, EncounterAccess, EncounterRecord
-from dndtracker.backend.security import hash_token
-from dndtracker.backend.state import build_initial_state
+from .engine import apply_host_action
+from .models import CreatedEncounter, EncounterAccess, EncounterRecord
+from .security import hash_token
+from .state import build_initial_state
+
+
+def _role_label(role: str) -> str:
+    return role.capitalize()
+
+
+def _next_state_with_event(state: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]:
+    next_state = dict(state)
+    next_state["version"] = int(state["version"]) + 1
+    next_meta = dict(state["meta"])
+    next_meta["updatedAt"] = datetime.now(timezone.utc).isoformat()
+    next_state["meta"] = next_meta
+
+    next_log = list(state.get("log", []))
+    next_log.append(event)
+    next_state["log"] = next_log
+
+    if event["kind"] == "chat":
+        next_chat = list(state.get("chat", []))
+        next_chat.append(
+            {
+                "role": event["role"],
+                "text": event["message"],
+                "whoLabel": event["whoLabel"],
+                "actorId": event.get("actorId"),
+            }
+        )
+        next_state["chat"] = next_chat
+
+    if event["kind"] == "action":
+        reduced = apply_host_action(state=next_state, action=event["action"])
+        next_state = reduced.state
+        next_log.extend(reduced.engine_events)
+        next_state["log"] = next_log
+
+    return next_state
 
 
 class EncounterStore(Protocol):
@@ -107,33 +143,12 @@ class InMemoryEncounterStore:
         payload = self._encounters[encounter_id]
         payload["state"] = self._next_state_with_event(
             state=payload["state"],
-            event={"kind": "chat", "role": access.role, "message": message},
+            event={"kind": "chat", "role": access.role, "message": message, "whoLabel": _role_label(access.role), "actorId": None},
         )
         return payload["state"]
 
     def _next_state_with_event(self, state: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]:
-        next_state = dict(state)
-        next_state["version"] = int(state["version"]) + 1
-        next_meta = dict(state["meta"])
-        next_meta["updatedAt"] = datetime.now(timezone.utc).isoformat()
-        next_state["meta"] = next_meta
-
-        next_log = list(state.get("log", []))
-        next_log.append(event)
-        next_state["log"] = next_log
-
-        if event["kind"] == "chat":
-            next_chat = list(state.get("chat", []))
-            next_chat.append({"role": event["role"], "text": event["message"]})
-            next_state["chat"] = next_chat
-
-        if event["kind"] == "action":
-            reduced = apply_host_action(state=next_state, action=event["action"])
-            next_state = reduced.state
-            next_log.extend(reduced.engine_events)
-            next_state["log"] = next_log
-
-        return next_state
+        return _next_state_with_event(state=state, event=event)
 
 
 @dataclass
@@ -225,22 +240,8 @@ class PostgresEncounterStore:
         if access is None or access.role != "HOST":
             return None
 
-        now_iso = datetime.now(timezone.utc).isoformat()
         event = {"kind": "action", "role": "HOST", "action": action}
-
-        next_state = dict(access.state)
-        next_state["version"] = int(access.state["version"]) + 1
-        next_meta = dict(access.state["meta"])
-        next_meta["updatedAt"] = now_iso
-        next_state["meta"] = next_meta
-
-        next_log = list(access.state.get("log", []))
-        next_log.append(event)
-
-        reduced = apply_host_action(state=next_state, action=action)
-        next_state = reduced.state
-        next_log.extend(reduced.engine_events)
-        next_state["log"] = next_log
+        next_state = _next_state_with_event(state=access.state, event=event)
 
         now = datetime.now(timezone.utc)
         with self._connect() as conn:
@@ -265,10 +266,93 @@ class PostgresEncounterStore:
         return next_state
 
     def append_roll(self, encounter_id: str, raw_token: str, roll: dict[str, Any]) -> dict[str, Any] | None:
-        raise NotImplementedError("PostgresEncounterStore is not implemented in ISSUE-05 scope")
+        access = self.get_encounter_access(encounter_id=encounter_id, raw_token=raw_token)
+        if access is None:
+            return None
+
+        actor_id = roll.get("actorId") if isinstance(roll.get("actorId"), str) else None
+        who_label_raw = roll.get("whoLabel")
+        who_label = str(who_label_raw).strip() if who_label_raw else _role_label(access.role)
+        event = {
+            "kind": "roll",
+            "role": access.role,
+            "roll": roll,
+            "whoLabel": who_label,
+            "actorId": actor_id,
+        }
+        next_state = _next_state_with_event(state=access.state, event=event)
+
+        now = datetime.now(timezone.utc)
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO encounter_rolls (id, encounter_id, created_at, actor_id, who_label, roll_json)
+                    VALUES (%s, %s, %s, %s, %s, %s::jsonb)
+                    """,
+                    (str(uuid.uuid4()), encounter_id, now, actor_id, who_label, json.dumps(roll)),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO encounter_snapshots (id, encounter_id, version, created_at, state_json)
+                    VALUES (%s, %s, %s, %s, %s::jsonb)
+                    """,
+                    (str(uuid.uuid4()), encounter_id, next_state["version"], now, json.dumps(next_state)),
+                )
+                cur.execute(
+                    """
+                    UPDATE encounters
+                    SET current_version = %s, status = %s, updated_at = %s
+                    WHERE id = %s
+                    """,
+                    (next_state["version"], next_state.get("status", "setup"), now, encounter_id),
+                )
+            conn.commit()
+
+        return next_state
 
     def append_chat(self, encounter_id: str, raw_token: str, message: str) -> dict[str, Any] | None:
-        raise NotImplementedError("PostgresEncounterStore is not implemented in ISSUE-05 scope")
+        access = self.get_encounter_access(encounter_id=encounter_id, raw_token=raw_token)
+        if access is None:
+            return None
+
+        event = {
+            "kind": "chat",
+            "role": access.role,
+            "message": message,
+            "whoLabel": _role_label(access.role),
+            "actorId": None,
+        }
+        next_state = _next_state_with_event(state=access.state, event=event)
+
+        now = datetime.now(timezone.utc)
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO encounter_chat (id, encounter_id, created_at, who_label, actor_id, text)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (str(uuid.uuid4()), encounter_id, now, _role_label(access.role), None, message),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO encounter_snapshots (id, encounter_id, version, created_at, state_json)
+                    VALUES (%s, %s, %s, %s, %s::jsonb)
+                    """,
+                    (str(uuid.uuid4()), encounter_id, next_state["version"], now, json.dumps(next_state)),
+                )
+                cur.execute(
+                    """
+                    UPDATE encounters
+                    SET current_version = %s, status = %s, updated_at = %s
+                    WHERE id = %s
+                    """,
+                    (next_state["version"], next_state.get("status", "setup"), now, encounter_id),
+                )
+            conn.commit()
+
+        return next_state
 
 
 def create_store(database_url: str | None, server_salt: str) -> EncounterStore:
