@@ -1,6 +1,6 @@
 # D&D Tracker V0 — Arbeitsplätze als Issues
 
-Diese Sammlung übersetzt die im `dndtracker/plan.md` definierten Implementationspakete in konkrete Issue-Entwürfe inklusive Label-Gruppierung.
+Diese Sammlung übersetzt die im `plan.md` definierten Implementationspakete in konkrete Issue-Entwürfe inklusive Label-Gruppierung.
 
 ## Issue-Reihenfolge
 1. ISSUE-01 — Lokaler Server + DB-Foundation
@@ -11,4 +11,4 @@ Diese Sammlung übersetzt die im `dndtracker/plan.md` definierten Implementation
 6. ISSUE-06 — Effects, Concentration, Saves
 
 ## Label-Definitionen
-Siehe `dndtracker/issues/LABELS.md`.
+Siehe `issues/LABELS.md`.

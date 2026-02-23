@@ -116,6 +116,7 @@ Der serverseitige State ist ein JSON-Dokument (versioniert).
 - `round: int` (start 1)
 - `turnIndex: int`
 - `turnOrder: string[]`
+- `players: Player[]`
 - `actors: Record<actorId, Actor>`
 - `effects: Effect[]`
 - `concentration: Record<actorId, ConcentrationState | null>`
@@ -124,6 +125,11 @@ Der serverseitige State ist ein JSON-Dokument (versioniert).
 - `meta: { name, createdAt, updatedAt }`
 
 (Actor/Effect/Concentration/Chat/Log wie im V1-Dokument.)
+
+**Player**
+- `id: string`
+- `name: string`
+- `initiative: int | null` (1-99, falls gesetzt)
 
 ---
 

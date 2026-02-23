@@ -1,8 +1,8 @@
 # ISSUE-01 Check gegen Konzept (`plan.md`) und Scope
 
 ## Referenz
-- Issue: `dndtracker/issues/ISSUE-01-server-db-foundation.md`
-- Konzept: `dndtracker/plan.md` (Abschnitt 5 und 6)
+- Issue: `issues/ISSUE-01-server-db-foundation.md`
+- Konzept: `plan.md` (Abschnitt 5 und 6)
 
 ## Abgleich
 
@@ -12,8 +12,8 @@
 - [x] SQL-Schema für `encounters`, `encounter_tokens`, `encounter_snapshots` vorhanden.
 - [x] Optional empfohlene Tabellen `encounter_rolls`, `encounter_chat` vorhanden.
 - [x] Lokale Postgres-Konfiguration über Env (`.env.example`) definiert.
-- [x] Migration für lokales Postgres vorhanden (`python -m dndtracker.backend.migrate`).
-- [x] Server ist lokal startbar (`uvicorn dndtracker.backend.api:app --host 127.0.0.1 --port 8000`).
+- [x] Migration für lokales Postgres vorhanden (`python -m backend.migrate`).
+- [x] Server ist lokal startbar (`uvicorn backend.api:app --host 127.0.0.1 --port 8000`).
 
 ## Hinweise zur aktuellen Implementierung
 

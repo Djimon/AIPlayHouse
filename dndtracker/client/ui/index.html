@@ -3,47 +3,129 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DND Tracker V0</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background: #10121a; color: #e8eaf1; }
-    .panel { background: #1b2030; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
-    input, button, textarea { width: 100%; margin-top: 6px; margin-bottom: 8px; padding: 8px; border-radius: 6px; border: 1px solid #3d465f; background: #0d1220; color: #e8eaf1; }
-    button { cursor: pointer; background: #2c4fff; border: none; }
-    button:disabled { background: #5b6175; cursor: not-allowed; }
-    .row { display: flex; gap: 12px; }
-    .row > .panel { flex: 1; }
-    pre { white-space: pre-wrap; word-break: break-word; background: #0d1220; padding: 8px; border-radius: 6px; }
-    .small { font-size: 12px; color: #9aa0b6; }
-  </style>
+  <title>DND Tracker V0.5</title>
+  <link rel="stylesheet" href="./app.css" />
 </head>
 <body>
-  <h1>DND Tracker V0</h1>
+  <h1>DND Tracker V0.5</h1>
   <div class="panel">
-    <div><strong>Rolle:</strong> <span id="role">-</span></div>
-    <div><strong>Server:</strong> <span id="server">-</span></div>
-    <div><strong>Encounter:</strong> <span id="encounter">-</span></div>
+    <h3>Session</h3>
+    <div class="meta">
+      <div><strong>Rolle:</strong> <span id="role">-</span></div>
+      <div><strong>Server:</strong> <span id="server">-</span></div>
+      <div><strong>Encounter:</strong> <span id="encounter">-</span></div>
+    </div>
+    <div class="grid">
+      <input id="joinEncounterId" placeholder="Encounter ID" />
+      <input id="joinToken" placeholder="Token" />
+    </div>
+    <button id="joinBtn">Beitreten</button>
   </div>
 
   <div class="row">
-    <div class="panel">
+    <div class="panel" id="hostPanel">
       <h3>Host</h3>
-      <input id="encounterName" placeholder="Encounter Name" value="Session Local" />
-      <button id="createEncounterBtn">Encounter erstellen</button>
-      <div class="small">Host-Token</div>
-      <pre id="hostToken">-</pre>
-      <div class="small">Player-Token</div>
-      <pre id="playerToken">-</pre>
-      <button id="hostActionBtn" disabled>Host Action: NEXT_TURN</button>
+      <div class="section">
+        <div class="section-title">Encounter</div>
+        <input id="encounterName" placeholder="Encounter Name" value="Session Local" />
+        <button id="createEncounterBtn">Encounter erstellen</button>
+        <div class="small">Host-Token</div>
+        <pre id="hostToken">-</pre>
+        <div class="small">Player-Token</div>
+        <pre id="playerToken">-</pre>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Zug</div>
+        <button id="nextTurnBtn" disabled>Naechster Zug</button>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Spieler</div>
+        <div id="playerList" class="stack">Keine Spieler registriert.</div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Effekte</div>
+        <div class="grid">
+          <input id="effectId" placeholder="Effect ID" />
+          <input id="effectRounds" type="number" min="1" placeholder="Runden verbleibend" />
+        </div>
+        <div class="grid">
+          <input id="effectConcentrationActorId" placeholder="Konzentration Actor ID" />
+          <input id="effectSourceActorId" placeholder="Source Actor ID" />
+        </div>
+        <label class="checkbox">
+          <input id="effectRequiresConcentration" type="checkbox" />
+          Benutzt Konzentration
+        </label>
+        <div class="grid">
+          <button id="addEffectBtn" disabled>Effect hinzufuegen</button>
+          <button id="removeEffectBtn" disabled>Effect entfernen</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Schaden</div>
+        <div class="grid">
+          <input id="damageActorId" placeholder="Actor ID" />
+          <input id="damageTaken" type="number" min="1" placeholder="Schaden erhalten" />
+        </div>
+        <button id="applyDamageBtn" disabled>Schaden anwenden</button>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Konzentrationswurf</div>
+        <div class="grid">
+          <input id="concentrationActorId" placeholder="Actor ID" />
+          <select id="concentrationResult">
+            <option value="success">Erfolg</option>
+            <option value="fail">Fehlschlag</option>
+          </select>
+        </div>
+        <button id="resolveConcentrationBtn" disabled>Konzentration aufloesen</button>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Save Ergebnis</div>
+        <div class="grid">
+          <input id="saveEffectId" placeholder="Effect ID" />
+          <select id="saveResult">
+            <option value="success">Erfolg</option>
+            <option value="fail">Fehlschlag</option>
+          </select>
+        </div>
+        <button id="applySaveBtn" disabled>Save anwenden</button>
+      </div>
     </div>
 
-    <div class="panel">
-      <h3>Player/Join</h3>
-      <input id="joinEncounterId" placeholder="Encounter ID" />
-      <input id="joinToken" placeholder="Token" />
-      <button id="joinBtn">Beitreten</button>
-      <button id="rollBtn" disabled>Roll senden (d20=14)</button>
-      <textarea id="chatText" placeholder="Chat Nachricht"></textarea>
-      <button id="chatBtn" disabled>Chat senden</button>
+    <div class="panel" id="playerPanel">
+      <h3>Player</h3>
+      <div class="section">
+        <div class="section-title">Registrierung</div>
+        <input id="playerName" placeholder="Spielername" />
+        <button id="registerBtn" disabled>Registrieren</button>
+      </div>
+      <div class="section">
+        <div class="section-title">Wurf</div>
+        <div class="grid">
+          <select id="rollKind">
+            <option value="d4">d4</option>
+            <option value="d6">d6</option>
+            <option value="d8">d8</option>
+            <option value="d10">d10</option>
+            <option value="d12">d12</option>
+            <option value="d20" selected>d20</option>
+            <option value="d100">d100</option>
+          </select>
+          <button id="rollBtn" disabled>Wuerfeln</button>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Chat</div>
+        <textarea id="chatText" placeholder="Chat Nachricht"></textarea>
+        <button id="chatBtn" disabled>Chat senden</button>
+      </div>
     </div>
   </div>
 

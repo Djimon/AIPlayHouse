@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-import os
+import secrets
 from collections import defaultdict
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from .config import load_settings
 from .security import generate_token
-from .store import EncounterStore, InMemoryEncounterStore
+from .store import EncounterStore, create_store
 
 
 class CreateEncounterRequest(BaseModel):
@@ -40,6 +42,11 @@ class RollEnvelope(BaseModel):
 class ChatEnvelope(BaseModel):
     token: str = Field(min_length=1)
     message: str = Field(min_length=1, max_length=1000)
+
+
+class RegisterPlayerRequest(BaseModel):
+    token: str = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=200)
 
 
 class EncounterWebSocketHub:
@@ -73,12 +80,33 @@ class EncounterWebSocketHub:
 
 
 def _default_store() -> EncounterStore:
-    server_salt = os.getenv("DNDTRACKER_SERVER_SALT", "dev-salt")
-    return InMemoryEncounterStore(server_salt=server_salt)
+    settings = load_settings()
+    return create_store(database_url=settings.database_url, server_salt=settings.server_salt)
+
+
+def _server_roll(roll: dict[str, Any]) -> dict[str, Any]:
+    kind_raw = roll.get("kind")
+    kind = str(kind_raw).strip().lower()
+    if not kind:
+        raise HTTPException(status_code=400, detail="roll.kind required")
+    sides = {"d4": 4, "d6": 6, "d8": 8, "d10": 10, "d12": 12, "d20": 20, "d100": 100}.get(kind)
+    if sides is None:
+        raise HTTPException(status_code=400, detail=f"Unsupported roll kind: {kind}")
+    normalized = dict(roll)
+    normalized["kind"] = kind
+    normalized["value"] = secrets.randbelow(sides) + 1
+    return normalized
 
 
 def create_app(store: EncounterStore | None = None) -> FastAPI:
-    app = FastAPI(title="DND Tracker API", version="0.2.0")
+    app = FastAPI(title="DND Tracker API", version="0.5.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     encounter_store = store if store is not None else _default_store()
     websocket_hub = EncounterWebSocketHub()
     app.state.websocket_hub = websocket_hub
@@ -138,7 +166,8 @@ def create_app(store: EncounterStore | None = None) -> FastAPI:
         payload: RollEnvelope,
         local_store: EncounterStore = Depends(get_store),
     ) -> EncounterStateResponse:
-        state = local_store.append_roll(encounter_id=encounter_id, raw_token=payload.token, roll=payload.roll)
+        roll = _server_roll(payload.roll)
+        state = local_store.append_roll(encounter_id=encounter_id, raw_token=payload.token, roll=roll)
         if state is None:
             raise HTTPException(status_code=403, detail="Roll not allowed")
         await publish_state(encounter_id=encounter_id, state=state)
@@ -153,6 +182,18 @@ def create_app(store: EncounterStore | None = None) -> FastAPI:
         state = local_store.append_chat(encounter_id=encounter_id, raw_token=payload.token, message=payload.message)
         if state is None:
             raise HTTPException(status_code=403, detail="Chat not allowed")
+        await publish_state(encounter_id=encounter_id, state=state)
+        return EncounterStateResponse(state=state)
+
+    @app.post("/api/encounters/{encounter_id}/players", response_model=EncounterStateResponse)
+    async def register_player(
+        encounter_id: str,
+        payload: RegisterPlayerRequest,
+        local_store: EncounterStore = Depends(get_store),
+    ) -> EncounterStateResponse:
+        state = local_store.register_player(encounter_id=encounter_id, raw_token=payload.token, name=payload.name)
+        if state is None:
+            raise HTTPException(status_code=403, detail="Player registration not allowed")
         await publish_state(encounter_id=encounter_id, state=state)
         return EncounterStateResponse(state=state)
 

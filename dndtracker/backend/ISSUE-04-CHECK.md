@@ -1,8 +1,8 @@
 # ISSUE-04 Check gegen Konzept (`plan.md`) und Scope
 
 ## Referenz
-- Issue: `dndtracker/issues/ISSUE-04-actions-autosave-engine.md`
-- Konzept: `dndtracker/plan.md` (Abschnitte 5.2, 6.1, 7.1, 10 Paket 4)
+- Issue: `issues/ISSUE-04-actions-autosave-engine.md`
+- Konzept: `plan.md` (Abschnitte 5.2, 6.1, 7.1, 10 Paket 4)
 
 ## Abgleich
 

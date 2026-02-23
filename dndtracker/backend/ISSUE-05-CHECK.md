@@ -1,8 +1,8 @@
 # ISSUE-05 Check gegen Konzept (`plan.md`) und Scope
 
 ## Referenz
-- Issue: `dndtracker/issues/ISSUE-05-rolls-chat.md`
-- Konzept: `dndtracker/plan.md` (Abschnitte 5.2, 6.1, 10 Paket 5)
+- Issue: `issues/ISSUE-05-rolls-chat.md`
+- Konzept: `plan.md` (Abschnitte 5.2, 6.1, 10 Paket 5)
 
 ## Vor Umsetzung: offene Punkte (Ist-Stand)
 
@@ -35,5 +35,5 @@
 
 ## Test-Discovery Konsistenz
 
-- Importpfade für `backend`-Module wurden auf paketinterne relative Imports umgestellt, damit `python -m unittest -v` im Verzeichnis `dndtracker/` keine `ModuleNotFoundError` mehr durch absolute `dndtracker.*`-Imports wirft.
+- Importpfade für `backend`-Module wurden auf paketinterne relative Imports umgestellt, damit `python -m unittest -v` im Repo-Root keine `ModuleNotFoundError` mehr durch absolute `dndtracker.*`-Imports wirft.
 - `tests/__init__.py` wurde ergänzt, damit `unittest` die Testmodule im Ordner `tests/` bei Standard-Discovery zuverlässig findet.

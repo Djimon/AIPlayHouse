@@ -1,8 +1,8 @@
 # ISSUE-03 Check gegen Konzept (`plan.md`) und Scope
 
 ## Referenz
-- Issue: `dndtracker/issues/ISSUE-03-pywebview-host-player-ui.md`
-- Konzept: `dndtracker/plan.md` (Abschnitt 2, 10 Paket 3)
+- Issue: `issues/ISSUE-03-pywebview-host-player-ui.md`
+- Konzept: `plan.md` (Abschnitt 2, 10 Paket 3)
 
 ## Kurzabgleich
 

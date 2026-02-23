@@ -13,8 +13,8 @@ from urllib.parse import urlencode
 
 from urllib import error, request
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-UI_FILE = ROOT_DIR / "dndtracker" / "client" / "ui" / "index.html"
+ROOT_DIR = Path(__file__).resolve().parents[1]
+UI_FILE = ROOT_DIR / "client" / "ui" / "index.html"
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,7 +48,7 @@ def maybe_start_server(server_url: str) -> subprocess.Popen[str] | None:
         sys.executable,
         "-m",
         "uvicorn",
-        "dndtracker.backend.api:app",
+        "backend.api:app",
         "--host",
         host,
         "--port",

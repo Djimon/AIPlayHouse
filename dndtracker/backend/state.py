@@ -20,6 +20,7 @@ def build_initial_state(encounter_id: str, name: str) -> dict[str, Any]:
         "round": 1,
         "turnIndex": 0,
         "turnOrder": [],
+        "players": [],
         "actors": {},
         "effects": [],
         "concentration": {},

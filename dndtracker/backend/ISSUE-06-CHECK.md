@@ -1,21 +1,21 @@
 # ISSUE-06 Check gegen Konzept (`plan.md`) und Scope
 
 ## Referenz
-- Issue: `dndtracker/issues/ISSUE-06-effects-concentration-saves.md`
-- Konzept: `dndtracker/plan.md` (Abschnitte 7.1, 7.2, 7.3, 10 Paket 6)
+- Issue: `issues/ISSUE-06-effects-concentration-saves.md`
+- Konzept: `plan.md` (Abschnitte 7.1, 7.2, 7.3, 10 Paket 6)
 
 ## Vor Umsetzung: offene Punkte (Ist-Stand)
 
-- [ ] Engine unterstützte nur `NEXT_TURN`; es fehlten dedizierte Action-Flows für:
+- [x] Engine unterstützte nur `NEXT_TURN`; es fehlten dedizierte Action-Flows für:
   - `ADD_EFFECT`
   - `REMOVE_EFFECT`
   - `APPLY_DAMAGE`
   - `RESOLVE_CONCENTRATION_SAVE`
   - `APPLY_SAVE_RESULT`
-- [ ] Concentration-Logik bei Schaden (DC `max(10, floor(damageTaken/2))`) war nicht umgesetzt.
-- [ ] Auflösung des Concentration-Saves inkl. State-Änderung war nicht umgesetzt.
-- [ ] Save-End-Flow (`APPLY_SAVE_RESULT`) war nicht umgesetzt.
-- [ ] Unit-Tests für die neuen Engine-Flows fehlten.
+- [x] Concentration-Logik bei Schaden (DC `max(10, floor(damageTaken/2))`) war nicht umgesetzt.
+- [x] Auflösung des Concentration-Saves inkl. State-Änderung war nicht umgesetzt.
+- [x] Save-End-Flow (`APPLY_SAVE_RESULT`) war nicht umgesetzt.
+- [x] Unit-Tests für die neuen Engine-Flows fehlten.
 
 ## Umsetzungsschritte
 

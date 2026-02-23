@@ -41,6 +41,11 @@ def _next_state_with_event(state: dict[str, Any], event: dict[str, Any]) -> dict
         )
         next_state["chat"] = next_chat
 
+    if event["kind"] == "player_registered":
+        next_players = list(state.get("players", []))
+        next_players.append(dict(event["player"]))
+        next_state["players"] = next_players
+
     if event["kind"] == "action":
         reduced = apply_host_action(state=next_state, action=event["action"])
         next_state = reduced.state
@@ -68,6 +73,9 @@ class EncounterStore(Protocol):
 
     def append_chat(self, encounter_id: str, raw_token: str, message: str) -> dict[str, Any] | None:
         """Append a chat entry and return new state when authorized."""
+
+    def register_player(self, encounter_id: str, raw_token: str, name: str) -> dict[str, Any] | None:
+        """Register a player name and return new state when authorized."""
 
 
 @dataclass
@@ -144,6 +152,21 @@ class InMemoryEncounterStore:
         payload["state"] = self._next_state_with_event(
             state=payload["state"],
             event={"kind": "chat", "role": access.role, "message": message, "whoLabel": _role_label(access.role), "actorId": None},
+        )
+        return payload["state"]
+
+    def register_player(self, encounter_id: str, raw_token: str, name: str) -> dict[str, Any] | None:
+        access = self.get_encounter_access(encounter_id=encounter_id, raw_token=raw_token)
+        if access is None or access.role != "PLAYER":
+            return None
+        payload = self._encounters[encounter_id]
+        payload["state"] = self._next_state_with_event(
+            state=payload["state"],
+            event={
+                "kind": "player_registered",
+                "role": access.role,
+                "player": {"id": str(uuid.uuid4()), "name": name, "initiative": None},
+            },
         )
         return payload["state"]
 
@@ -241,6 +264,40 @@ class PostgresEncounterStore:
             return None
 
         event = {"kind": "action", "role": "HOST", "action": action}
+        next_state = _next_state_with_event(state=access.state, event=event)
+
+        now = datetime.now(timezone.utc)
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO encounter_snapshots (id, encounter_id, version, created_at, state_json)
+                    VALUES (%s, %s, %s, %s, %s::jsonb)
+                    """,
+                    (str(uuid.uuid4()), encounter_id, next_state["version"], now, json.dumps(next_state)),
+                )
+                cur.execute(
+                    """
+                    UPDATE encounters
+                    SET current_version = %s, status = %s, updated_at = %s
+                    WHERE id = %s
+                    """,
+                    (next_state["version"], next_state.get("status", "setup"), now, encounter_id),
+                )
+            conn.commit()
+
+        return next_state
+
+    def register_player(self, encounter_id: str, raw_token: str, name: str) -> dict[str, Any] | None:
+        access = self.get_encounter_access(encounter_id=encounter_id, raw_token=raw_token)
+        if access is None or access.role != "PLAYER":
+            return None
+
+        event = {
+            "kind": "player_registered",
+            "role": access.role,
+            "player": {"id": str(uuid.uuid4()), "name": name, "initiative": None},
+        }
         next_state = _next_state_with_event(state=access.state, event=event)
 
         now = datetime.now(timezone.utc)

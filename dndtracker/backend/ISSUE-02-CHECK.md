@@ -1,8 +1,8 @@
 # ISSUE-02 Check gegen Konzept (`plan.md`) und Scope
 
 ## Referenz
-- Issue: `dndtracker/issues/ISSUE-02-websocket-broadcast.md`
-- Konzept: `dndtracker/plan.md` (Abschnitte 1.3, 6.2, 10 Paket 2)
+- Issue: `issues/ISSUE-02-websocket-broadcast.md`
+- Konzept: `plan.md` (Abschnitte 1.3, 6.2, 10 Paket 2)
 
 ## Kurzabgleich
 

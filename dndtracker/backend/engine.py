@@ -27,6 +27,8 @@ def apply_host_action(state: dict[str, Any], action: dict[str, Any]) -> ActionRe
         return _apply_resolve_concentration_save(state=state, action=action)
     if action_type == "APPLY_SAVE_RESULT":
         return _apply_save_result(state=state, action=action)
+    if action_type == "SET_INITIATIVE":
+        return _apply_set_initiative(state=state, action=action)
     return ActionResult(state=_with_running_status(state), engine_events=[])
 
 
@@ -75,13 +77,47 @@ def _apply_add_effect(state: dict[str, Any], action: dict[str, Any]) -> ActionRe
     effects = list(next_state.get("effects", []))
     effect = action.get("effect")
     if isinstance(effect, dict):
-        effects.append(dict(effect))
+        effect_copy = dict(effect)
+        effects.append(effect_copy)
         next_state["effects"] = effects
+        next_state = _ensure_concentration_for_effect(state=next_state, effect=effect_copy)
         return ActionResult(
             state=next_state,
             engine_events=[{"kind": "effect_added", "effect": dict(effect), "action": action}],
         )
     return ActionResult(state=next_state, engine_events=[])
+
+
+def _ensure_concentration_for_effect(state: dict[str, Any], effect: dict[str, Any]) -> dict[str, Any]:
+    actor_id: str | None = None
+    concentration_actor_id = effect.get("concentrationActorId")
+    if isinstance(concentration_actor_id, str) and concentration_actor_id:
+        actor_id = concentration_actor_id
+    elif effect.get("requiresConcentration") is True:
+        source_actor_id = effect.get("sourceActorId")
+        if isinstance(source_actor_id, str) and source_actor_id:
+            actor_id = source_actor_id
+
+    if actor_id is None:
+        return state
+
+    concentration = dict(state.get("concentration", {}))
+    current_entry = concentration.get(actor_id)
+    if current_entry is None or not isinstance(current_entry, dict) or not current_entry:
+        concentration[actor_id] = {"checkNeeded": False}
+        next_state = dict(state)
+        next_state["concentration"] = concentration
+        return next_state
+
+    if "checkNeeded" not in current_entry:
+        updated_entry = dict(current_entry)
+        updated_entry["checkNeeded"] = False
+        concentration[actor_id] = updated_entry
+        next_state = dict(state)
+        next_state["concentration"] = concentration
+        return next_state
+
+    return state
 
 
 def _apply_remove_effect(state: dict[str, Any], action: dict[str, Any]) -> ActionResult:
@@ -99,6 +135,52 @@ def _apply_remove_effect(state: dict[str, Any], action: dict[str, Any]) -> Actio
     return ActionResult(
         state=next_state,
         engine_events=[{"kind": "effect_removed", "effectId": effect_id, "action": action}],
+    )
+
+
+def _build_turn_order(players: list[dict[str, Any]]) -> list[str]:
+    ranked: list[tuple[int, dict[str, Any]]] = []
+    for idx, player in enumerate(players):
+        if not isinstance(player, dict):
+            continue
+        initiative = player.get("initiative")
+        if isinstance(initiative, int):
+            ranked.append((idx, player))
+    ranked.sort(key=lambda item: (-item[1]["initiative"], item[0]))
+    return [player["id"] for _, player in ranked if isinstance(player.get("id"), str)]
+
+
+def _apply_set_initiative(state: dict[str, Any], action: dict[str, Any]) -> ActionResult:
+    next_state = _with_running_status(state)
+    player_id = action.get("playerId")
+    initiative_raw = action.get("initiative")
+    if not isinstance(player_id, str) or player_id == "":
+        return ActionResult(state=next_state, engine_events=[])
+    if not isinstance(initiative_raw, int) or initiative_raw < 1 or initiative_raw > 99:
+        return ActionResult(state=next_state, engine_events=[])
+
+    players = list(next_state.get("players", []))
+    updated = False
+    for idx, player in enumerate(players):
+        if not isinstance(player, dict) or player.get("id") != player_id:
+            continue
+        updated_player = dict(player)
+        updated_player["initiative"] = initiative_raw
+        players[idx] = updated_player
+        updated = True
+        break
+
+    if not updated:
+        return ActionResult(state=next_state, engine_events=[])
+
+    next_state["players"] = players
+    next_state["turnOrder"] = _build_turn_order(players)
+    next_state["turnIndex"] = 0
+    return ActionResult(
+        state=next_state,
+        engine_events=[
+            {"kind": "initiative_set", "playerId": player_id, "initiative": initiative_raw, "action": action}
+        ],
     )
 
 
